@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import type { MediaItem } from "@/lib/mediaData";
+import type { MediaItem } from "@/hooks/useMediaData";
 
 interface MediaCardProps {
   item: MediaItem;
@@ -8,13 +8,13 @@ interface MediaCardProps {
 }
 
 const MediaCard = ({ item, index, onClick }: MediaCardProps) => {
-  const isMovie = item.type === "movie";
+  const isMovie = item.mediaType !== "song";
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.05 }}
+      transition={{ duration: 0.4, delay: Math.min(index * 0.03, 0.5) }}
       className="group cursor-pointer"
       onClick={() => onClick(item)}
     >
@@ -28,6 +28,9 @@ const MediaCard = ({ item, index, onClick }: MediaCardProps) => {
           alt={item.title}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
           loading="lazy"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = "/placeholder.svg";
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
       </div>
@@ -35,7 +38,7 @@ const MediaCard = ({ item, index, onClick }: MediaCardProps) => {
         <p className="font-display font-semibold text-sm text-foreground truncate">
           {item.title}
         </p>
-        <p className="text-xs text-muted-foreground">{item.year}</p>
+        <p className="text-xs text-muted-foreground truncate">{item.extra}</p>
       </div>
     </motion.div>
   );

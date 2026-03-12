@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Download, Clock, HardDrive, Tag, User } from "lucide-react";
-import type { MediaItem } from "@/lib/mediaData";
+import { X, Download, ExternalLink, User } from "lucide-react";
+import type { MediaItem } from "@/hooks/useMediaData";
 
 interface MediaDetailModalProps {
   item: MediaItem | null;
@@ -9,6 +9,9 @@ interface MediaDetailModalProps {
 
 const MediaDetailModal = ({ item, onClose }: MediaDetailModalProps) => {
   if (!item) return null;
+
+  const isMovie = item.mediaType !== "song";
+  const sourceLabel = isMovie ? "t4tsa.cc" : "trendybeatz.com";
 
   return (
     <AnimatePresence>
@@ -26,6 +29,9 @@ const MediaDetailModal = ({ item, onClose }: MediaDetailModalProps) => {
             src={item.image}
             alt=""
             className="h-full w-full object-cover scale-110 blur-3xl opacity-30"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
           />
           <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
         </div>
@@ -52,49 +58,37 @@ const MediaDetailModal = ({ item, onClose }: MediaDetailModalProps) => {
               src={item.image}
               alt={item.title}
               className={`rounded-lg object-cover shadow-card ${
-                item.type === "movie" ? "w-28 aspect-[2/3]" : "w-28 aspect-square"
+                isMovie ? "w-28 aspect-[2/3]" : "w-28 aspect-square"
               }`}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "/placeholder.svg";
+              }}
             />
             <div className="flex-1 min-w-0">
               <h2 className="font-display text-xl font-bold text-foreground">
                 {item.title}
               </h2>
-              <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" /> {item.year}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Tag className="h-3 w-3" /> {item.genre}
-                </span>
-                <span className="flex items-center gap-1">
-                  <HardDrive className="h-3 w-3" /> {item.size}
-                </span>
-              </div>
               <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                 <User className="h-3 w-3" /> {item.extra}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Source: {sourceLabel}
               </p>
             </div>
           </div>
 
-          <p className="mt-4 text-sm text-muted-foreground leading-relaxed">
-            {item.description}
-          </p>
-
           <a
-            href={
-              item.type === "movie"
-                ? `https://t4tsa.cc/search?q=${encodeURIComponent(item.title)}`
-                : `https://trendybeatz.com/search?q=${encodeURIComponent(item.title)}`
-            }
+            href={item.link}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-5 w-full flex items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground font-display font-semibold py-3 transition-all hover:shadow-glow hover:brightness-110 active:scale-[0.98]"
           >
             <Download className="h-4 w-4" />
-            Download ({item.size})
+            {isMovie ? "Watch / Download" : "Download MP3"}
           </a>
-          <p className="mt-2 text-center text-xs text-muted-foreground">
-            via {item.type === "movie" ? "t4tsa.cc" : "trendybeatz.com"}
+          <p className="mt-2 text-center text-xs text-muted-foreground flex items-center justify-center gap-1">
+            <ExternalLink className="h-3 w-3" />
+            Opens on {sourceLabel}
           </p>
         </motion.div>
       </motion.div>
