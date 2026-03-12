@@ -97,14 +97,14 @@ const parseSongsFromHtml = (html: string): SongItem[] => {
     let artist = textMatches.length >= 2 ? textMatches[textMatches.length - 2] : "";
     let title = textMatches.length >= 1 ? textMatches[textMatches.length - 1] : "";
 
-    if (!title || isNoise(title)) {
-      const parsed = parseFromSlug(slug);
-      artist = artist || parsed.artist;
-      title = parsed.title;
+    const parsedFromSlug = parseFromSlug(slug);
+
+    if (!title || isNoise(title) || title.includes("--")) {
+      title = parsedFromSlug.title;
     }
 
     if (!artist || isNoise(artist)) {
-      artist = parseFromSlug(slug).artist;
+      artist = parsedFromSlug.artist;
     }
 
     if (!title) continue;

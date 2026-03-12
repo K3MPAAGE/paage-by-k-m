@@ -162,7 +162,11 @@ Deno.serve(async (req) => {
           `https://thenkiri.com/?s=${encodeURIComponent(query)}`,
           `https://nkiri.ink/?s=${encodeURIComponent(query)}`,
         ]
-      : ["https://thenkiri.com/movies/", "https://thenkiri.com/tv-series/"];
+      : [
+          "https://thenkiri.com/?s=2026",
+          "https://thenkiri.com/?s=2025",
+          "https://thenkiri.com/?s=2024",
+        ];
 
     const fzUrls = query
       ? [
