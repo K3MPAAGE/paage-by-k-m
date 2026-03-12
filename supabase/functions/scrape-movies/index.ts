@@ -96,7 +96,7 @@ const parseNkiri = (html: string): MovieItem[] => {
 const parseFzMovies = (html: string): MovieItem[] => {
   const results: MovieItem[] = [];
   const regex =
-    /href=["']((?:https?:\/\/(?:www\.)?fzmovies\.net)?\/movie-([^"'#?]+?)--hmp4\.htm[^"']*)["']/gi;
+    /href=["']((?:https?:\/\/(?:www\.)?fzmovies\.website)?\/movie-([^"'#?]+?)--hmp4\.htm[^"']*)["']/gi;
 
   let match: RegExpExecArray | null;
   while ((match = regex.exec(html)) !== null) {
