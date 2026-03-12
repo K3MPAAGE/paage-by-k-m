@@ -1,1 +1,7 @@
 project_id = "bhfyurgukqydpwmderib"
+
+[functions.scrape-movies]
+verify_jwt = false
+
+[functions.scrape-music]
+verify_jwt = false
