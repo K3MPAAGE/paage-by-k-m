@@ -1,5 +1,3 @@
-import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -12,7 +10,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { page = 1, search = "" } = await req.json().catch(() => ({}));
+    const { search = "" } = await req.json().catch(() => ({}));
 
     let url = "https://t4tsa.cc";
     if (search) {
@@ -25,15 +23,12 @@ Deno.serve(async (req) => {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
     });
 
     const html = await res.text();
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    if (!doc) {
-      throw new Error("Failed to parse HTML");
-    }
+    console.log("HTML length:", html.length);
 
     const movies: Array<{
       id: string;
@@ -43,56 +38,135 @@ Deno.serve(async (req) => {
       type: string;
     }> = [];
 
-    // Parse movie links - they follow pattern /movie/{id} or /series/{id}
-    const links = doc.querySelectorAll("a[href]");
     const seen = new Set<string>();
 
-    for (let i = 0; i < links.length; i++) {
-      const a = links[i] as any;
-      const href = a.getAttribute("href") || "";
+    // Try __NEXT_DATA__ first (Next.js SSR data)
+    const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (nextDataMatch) {
+      try {
+        const nextData = JSON.parse(nextDataMatch[1]);
+        console.log("Found __NEXT_DATA__, parsing...");
+        
+        // Traverse the data to find movie/series items
+        const extractItems = (obj: any, path = ""): void => {
+          if (!obj || typeof obj !== "object") return;
+          
+          if (Array.isArray(obj)) {
+            for (const item of obj) {
+              if (item && typeof item === "object") {
+                // Look for items with tmdbId or id and title/name
+                const id = item.tmdbId || item.id;
+                const title = item.title || item.name;
+                const posterPath = item.posterPath || item.poster_path;
+                const mediaType = item.type || item.media_type || item.watchType;
+                
+                if (id && title && !seen.has(String(id))) {
+                  seen.add(String(id));
+                  
+                  let image = "";
+                  if (posterPath) {
+                    image = posterPath.startsWith("http") 
+                      ? posterPath 
+                      : `https://image.tmdb.org/t/p/w500${posterPath}`;
+                  }
+                  
+                  const isSeries = String(mediaType).toLowerCase().includes("series") || 
+                                   String(mediaType).toLowerCase().includes("tv") ||
+                                   String(id).startsWith("tt");
+                  
+                  movies.push({
+                    id: String(id),
+                    title,
+                    image,
+                    link: isSeries 
+                      ? `https://t4tsa.cc/series/${id}` 
+                      : `https://t4tsa.cc/movie/${id}`,
+                    type: isSeries ? "series" : "movie",
+                  });
+                }
+                extractItems(item, path + "[]");
+              }
+            }
+          } else {
+            for (const [key, value] of Object.entries(obj)) {
+              extractItems(value, path + "." + key);
+            }
+          }
+        };
+        
+        extractItems(nextData);
+      } catch (e) {
+        console.log("Failed to parse __NEXT_DATA__:", e);
+      }
+    }
+
+    // Fallback: regex-based parsing of HTML
+    if (movies.length === 0) {
+      console.log("Falling back to regex parsing...");
       
-      // Match movie and series links
-      const movieMatch = href.match(/\/(movie|series)\/([a-zA-Z0-9]+)$/);
-      if (!movieMatch) continue;
-
-      const id = movieMatch[2];
-      if (seen.has(id)) continue;
-      seen.add(id);
-
-      const mediaType = movieMatch[1]; // "movie" or "series"
-
-      // Get title from the text content or nested elements
-      let title = "";
-      const strong = a.querySelector("strong");
-      if (strong) {
-        title = strong.textContent?.trim() || "";
-      }
-      if (!title) {
-        title = a.textContent?.trim() || "";
-      }
-      if (!title) continue;
-
-      // Get image
-      let image = "";
-      const img = a.querySelector("img");
-      if (img) {
-        const src = img.getAttribute("src") || "";
-        // Extract the original TMDB URL from Next.js image proxy
-        const tmdbMatch = src.match(/url=([^&]+)/);
-        if (tmdbMatch) {
-          image = decodeURIComponent(tmdbMatch[1]);
-        } else {
-          image = src;
+      // Match links to /movie/ or /series/ pages
+      const linkRegex = /href="((?:https?:\/\/t4tsa\.cc)?\/(?:movie|series)\/([^"]+))"/g;
+      let match;
+      
+      while ((match = linkRegex.exec(html)) !== null) {
+        const fullHref = match[1];
+        const id = match[2];
+        
+        if (seen.has(id)) continue;
+        seen.add(id);
+        
+        const isSeries = fullHref.includes("/series/");
+        const link = fullHref.startsWith("http") ? fullHref : `https://t4tsa.cc${fullHref}`;
+        
+        // Find associated title - look for text near this link
+        // Try to find an img alt or text content near the href
+        const hrefPos = match.index;
+        const surroundingHtml = html.substring(hrefPos, hrefPos + 2000);
+        
+        let title = "";
+        // Try: alt attribute on img
+        const altMatch = surroundingHtml.match(/alt="([^"]+)"/);
+        if (altMatch) {
+          title = altMatch[1];
         }
+        // Try: text content after closing tags
+        if (!title) {
+          const textMatch = surroundingHtml.match(/>([^<]{2,50})</);
+          if (textMatch && !textMatch[1].includes("http") && !textMatch[1].includes("{")) {
+            title = textMatch[1].trim();
+          }
+        }
+        
+        if (!title) continue;
+        
+        // Find image - TMDB poster
+        let image = "";
+        const imgMatch = surroundingHtml.match(/(?:src|srcSet)="([^"]*image\.tmdb\.org[^"]*?)"/);
+        if (imgMatch) {
+          const imgUrl = imgMatch[1];
+          const tmdbPath = imgUrl.match(/\/t\/p\/\w+(\/.+?\.jpg)/);
+          if (tmdbPath) {
+            image = `https://image.tmdb.org/t/p/w500${tmdbPath[1]}`;
+          } else {
+            image = imgUrl;
+          }
+        }
+        // Also try the Next.js image proxy format
+        if (!image) {
+          const nextImgMatch = surroundingHtml.match(/url=([^&"]+)/);
+          if (nextImgMatch) {
+            image = decodeURIComponent(nextImgMatch[1]);
+          }
+        }
+        
+        movies.push({
+          id,
+          title,
+          image,
+          link,
+          type: isSeries ? "series" : "movie",
+        });
       }
-
-      movies.push({
-        id,
-        title,
-        image: image || `https://image.tmdb.org/t/p/w500/placeholder.jpg`,
-        link: href.startsWith("http") ? href : `https://t4tsa.cc${href}`,
-        type: mediaType === "series" ? "series" : "movie",
-      });
     }
 
     console.log(`Found ${movies.length} items`);

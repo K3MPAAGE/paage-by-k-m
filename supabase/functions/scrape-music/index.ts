@@ -1,5 +1,3 @@
-import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -28,15 +26,12 @@ Deno.serve(async (req) => {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
     });
 
     const html = await res.text();
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    if (!doc) {
-      throw new Error("Failed to parse HTML");
-    }
+    console.log("HTML length:", html.length);
 
     const songs: Array<{
       id: string;
@@ -46,61 +41,102 @@ Deno.serve(async (req) => {
       link: string;
     }> = [];
 
-    // Parse music download links
-    const links = doc.querySelectorAll("a[href]");
     const seen = new Set<string>();
 
-    for (let i = 0; i < links.length; i++) {
-      const a = links[i] as any;
-      const href = a.getAttribute("href") || "";
+    // Regex to find download-mp3 links
+    const linkRegex = /href="((?:https?:\/\/trendybeatz\.com)?\/download-mp3\/(\d+)\/([^"]+))"/g;
+    let match;
 
-      // Match download-mp3 links
-      const mp3Match = href.match(/\/download-mp3\/(\d+)\/(.+)$/);
-      if (!mp3Match) continue;
+    while ((match = linkRegex.exec(html)) !== null) {
+      const fullHref = match[1];
+      const id = match[2];
+      const slug = match[3];
 
-      const id = mp3Match[1];
       if (seen.has(id)) continue;
       seen.add(id);
 
-      // Extract text content to find artist and title
-      const textContent = a.textContent || "";
-      const lines = textContent
-        .split("\n")
-        .map((l: string) => l.trim())
-        .filter((l: string) => l && l !== "Discover" && l !== "|" && l !== "Stream" && !l.startsWith("🇳🇬") && !l.startsWith("🇬🇭") && !l.startsWith("🇿🇦") && l !== "Song of the Day" && l !== "Discover |");
+      const link = fullHref.startsWith("http")
+        ? fullHref
+        : `https://trendybeatz.com${fullHref}`;
+
+      // Parse title and artist from slug
+      // Slug format: artist-name-song-title-ft-featured
+      // Better: look in surrounding HTML for the actual text
+      const hrefPos = match.index;
+      const startPos = Math.max(0, hrefPos - 1500);
+      const surroundingHtml = html.substring(startPos, hrefPos + 500);
 
       let artist = "";
       let title = "";
+      let image = "";
 
-      // Usually: artist name, then song title
-      if (lines.length >= 2) {
-        artist = lines[0];
-        title = lines[1];
-      } else if (lines.length === 1) {
-        title = lines[0];
+      // Find the image for this item - look for img src near this link
+      const imgMatches = [...surroundingHtml.matchAll(/src="(https?:\/\/trendybeatz\.com\/images\/[^"]+)"/g)];
+      if (imgMatches.length > 0) {
+        // Take the last image found before the link
+        image = imgMatches[imgMatches.length - 1][1];
       }
 
-      if (!title) continue;
+      // Parse from slug as fallback
+      const slugParts = decodeURIComponent(slug).replace(/-/g, " ").replace(/,/g, ",");
+      
+      // Try to find artist and title from HTML content near the link
+      // Look for patterns like: <strong>Artist Name</strong> or bold text
+      const textBlocks = surroundingHtml.match(/>([^<]{2,80})</g);
+      if (textBlocks) {
+        const cleanTexts = textBlocks
+          .map((t: string) => t.replace(/^>|<$/g, "").trim())
+          .filter((t: string) => 
+            t.length > 1 && 
+            !t.includes("http") && 
+            !t.includes("{") &&
+            !t.includes("Discover") &&
+            !t.includes("Stream") &&
+            t !== "|" &&
+            !t.startsWith("🇳🇬") &&
+            !t.startsWith("🇬🇭") &&
+            !t.startsWith("🇿🇦") &&
+            t !== "Naija" &&
+            t !== "Music" &&
+            t !== "Ghana" &&
+            t !== "African" &&
+            t !== "Song of the Day"
+          );
 
-      // Get image
-      let image = "";
-      const img = a.querySelector("img");
-      if (img) {
-        image = img.getAttribute("src") || "";
-        if (image && !image.startsWith("http")) {
-          image = `https://trendybeatz.com${image}`;
+        // Usually the last few text blocks before the link contain artist then title
+        if (cleanTexts.length >= 2) {
+          // Find the artist and title - they're typically the last 2 meaningful texts
+          artist = cleanTexts[cleanTexts.length - 2] || "";
+          title = cleanTexts[cleanTexts.length - 1] || "";
+        } else if (cleanTexts.length === 1) {
+          title = cleanTexts[0];
         }
       }
 
-      songs.push({
-        id,
-        title,
-        artist,
-        image,
-        link: href.startsWith("http")
-          ? href
-          : `https://trendybeatz.com${href}`,
-      });
+      // Fallback: parse from slug
+      if (!title) {
+        // Slug: artist-song-title-ft-featured
+        const parts = slugParts.split(" ft ");
+        const mainPart = parts[0];
+        const words = mainPart.split(" ");
+        // First 1-2 words are often the artist
+        if (words.length > 2) {
+          artist = words.slice(0, 2).join(" ");
+          title = words.slice(2).join(" ");
+        } else {
+          title = mainPart;
+        }
+        if (parts[1]) {
+          title += ` ft ${parts[1]}`;
+        }
+      }
+
+      // Capitalize title
+      title = title.replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+      if (!title) continue;
+
+      songs.push({ id, title, artist, image, link });
     }
 
     console.log(`Found ${songs.length} songs`);
