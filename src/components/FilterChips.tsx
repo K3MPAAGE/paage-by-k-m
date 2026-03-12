@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-const filters = ["All", "Movies", "Songs", "Trending", "Recently Added"] as const;
+const filters = ["All", "Movies", "Songs"] as const;
 export type FilterValue = (typeof filters)[number];
 
 interface FilterChipsProps {
