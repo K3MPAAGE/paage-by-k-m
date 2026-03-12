@@ -149,12 +149,13 @@ Deno.serve(async (req) => {
     const { search = "" } = await req.json().catch(() => ({}));
     const query = String(search || "").trim().toLowerCase();
 
-    const urls = query
-      ? [
-          `https://trendybeatz.com/search?q=${encodeURIComponent(query)}`,
-          "https://trendybeatz.com/music-download",
-        ]
-      : ["https://trendybeatz.com/music-download"];
+    // trendybeatz search is client-rendered, so fetch multiple listing pages and filter locally
+    const pages = query ? 5 : 3;
+    const urls = Array.from({ length: pages }, (_, i) =>
+      i === 0
+        ? "https://trendybeatz.com/music-download"
+        : `https://trendybeatz.com/music-download?page=${i + 1}`
+    );
 
     const allSongs: SongItem[] = [];
     const seen = new Set<string>();
