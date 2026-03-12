@@ -44,6 +44,8 @@ const isNoise = (text: string) => {
   const t = text.trim().toLowerCase();
   if (!t) return true;
   if (stopWords.has(t)) return true;
+  if (t === "--\u003e" || t === "→") return true;
+  if (t.startsWith("featuring:")) return true;
   if (t.startsWith("🇳🇬") || t.startsWith("🇬🇭") || t.startsWith("🇿🇦")) return true;
   return false;
 };
