@@ -14,7 +14,7 @@ const AppHeader = ({ searchQuery, onSearchChange }: AppHeaderProps) => {
             PAAGE <span className="text-primary">by K³M</span>
           </h1>
           <p className="text-[10px] text-muted-foreground leading-tight">
-            Movies via t4tsa.cc · Music via trendybeatz.com
+            Movies via TheNkiri + FzMovies · Music via trendybeatz.com
           </p>
         </div>
         <div className="relative flex-1 max-w-md">

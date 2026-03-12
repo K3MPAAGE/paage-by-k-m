@@ -1,147 +1,188 @@
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+type SongItem = {
+  id: string;
+  title: string;
+  artist: string;
+  image: string;
+  link: string;
+};
+
+const stopWords = new Set([
+  "discover",
+  "stream",
+  "music",
+  "naija",
+  "ghana",
+  "african",
+  "song of the day",
+  "|",
+  "download",
+]);
+
+const decodeHtml = (text: string) =>
+  text
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#8217;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const toTitleCase = (text: string) =>
+  text
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w[0]?.toUpperCase() + w.slice(1))
+    .join(" ");
+
+const isNoise = (text: string) => {
+  const t = text.trim().toLowerCase();
+  if (!t) return true;
+  if (stopWords.has(t)) return true;
+  if (t.startsWith("🇳🇬") || t.startsWith("🇬🇭") || t.startsWith("🇿🇦")) return true;
+  return false;
+};
+
+const parseFromSlug = (slug: string) => {
+  const clean = decodeURIComponent(slug)
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const words = clean.split(" ");
+  if (words.length <= 2) {
+    return { artist: "", title: toTitleCase(clean) };
+  }
+
+  const ftIndex = words.findIndex((w) => w.toLowerCase() === "ft");
+  const splitAt = words.length > 4 ? 2 : 1;
+  const artist = toTitleCase(words.slice(0, splitAt).join(" "));
+  const titleWords = words.slice(splitAt);
+
+  const title = toTitleCase(
+    ftIndex > splitAt
+      ? [...words.slice(splitAt, ftIndex), "ft", ...words.slice(ftIndex + 1)].join(" ")
+      : titleWords.join(" ")
+  );
+
+  return { artist, title };
+};
+
+const parseSongsFromHtml = (html: string): SongItem[] => {
+  const results: SongItem[] = [];
+  const regex = /href=["']((?:https?:\/\/trendybeatz\.com)?\/download-mp3\/(\d+)\/([^"']+))["']/gi;
+
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(html)) !== null) {
+    const link = match[1].startsWith("http") ? match[1] : `https://trendybeatz.com${match[1]}`;
+    const id = match[2];
+    const slug = match[3];
+
+    const around = html.substring(Math.max(0, match.index - 1800), match.index + 700);
+
+    const imageMatches = [...around.matchAll(/src=["'](https?:\/\/trendybeatz\.com\/images\/[^"']+)["']/gi)];
+    const image = imageMatches.length ? imageMatches[imageMatches.length - 1][1] : "/placeholder.svg";
+
+    const textMatches = [...around.matchAll(/>([^<]{2,120})</g)]
+      .map((m) => decodeHtml(m[1]))
+      .filter((t) => !isNoise(t) && !t.includes("http") && !t.includes("{"));
+
+    let artist = textMatches.length >= 2 ? textMatches[textMatches.length - 2] : "";
+    let title = textMatches.length >= 1 ? textMatches[textMatches.length - 1] : "";
+
+    if (!title || isNoise(title)) {
+      const parsed = parseFromSlug(slug);
+      artist = artist || parsed.artist;
+      title = parsed.title;
+    }
+
+    if (!artist || isNoise(artist)) {
+      artist = parseFromSlug(slug).artist;
+    }
+
+    if (!title) continue;
+
+    results.push({
+      id,
+      title: toTitleCase(title),
+      artist: toTitleCase(artist),
+      image,
+      link,
+    });
+  }
+
+  return results;
+};
+
+const fetchHtml = async (url: string) => {
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36",
+      Accept:
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      Connection: "keep-alive",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Fetch failed [${res.status}] ${url}`);
+  }
+
+  return await res.text();
 };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { page = 1, search = "" } = await req.json().catch(() => ({}));
+    const { search = "" } = await req.json().catch(() => ({}));
+    const query = String(search || "").trim().toLowerCase();
 
-    let url = "https://trendybeatz.com/music-download";
-    if (search) {
-      url = `https://trendybeatz.com/search?q=${encodeURIComponent(search)}`;
-    }
-    if (page > 1 && !search) {
-      url = `https://trendybeatz.com/music-download?page=${page}`;
-    }
+    const urls = query
+      ? [
+          `https://trendybeatz.com/search?q=${encodeURIComponent(query)}`,
+          "https://trendybeatz.com/music-download",
+        ]
+      : ["https://trendybeatz.com/music-download"];
 
-    console.log("Fetching:", url);
-
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-    });
-
-    const html = await res.text();
-    console.log("HTML length:", html.length);
-
-    const songs: Array<{
-      id: string;
-      title: string;
-      artist: string;
-      image: string;
-      link: string;
-    }> = [];
-
+    const allSongs: SongItem[] = [];
     const seen = new Set<string>();
 
-    // Regex to find download-mp3 links
-    const linkRegex = /href="((?:https?:\/\/trendybeatz\.com)?\/download-mp3\/(\d+)\/([^"]+))"/g;
-    let match;
+    for (const url of urls) {
+      try {
+        console.log("Fetching:", url);
+        const html = await fetchHtml(url);
+        const parsed = parseSongsFromHtml(html);
 
-    while ((match = linkRegex.exec(html)) !== null) {
-      const fullHref = match[1];
-      const id = match[2];
-      const slug = match[3];
-
-      if (seen.has(id)) continue;
-      seen.add(id);
-
-      const link = fullHref.startsWith("http")
-        ? fullHref
-        : `https://trendybeatz.com${fullHref}`;
-
-      // Parse title and artist from slug
-      // Slug format: artist-name-song-title-ft-featured
-      // Better: look in surrounding HTML for the actual text
-      const hrefPos = match.index;
-      const startPos = Math.max(0, hrefPos - 1500);
-      const surroundingHtml = html.substring(startPos, hrefPos + 500);
-
-      let artist = "";
-      let title = "";
-      let image = "";
-
-      // Find the image for this item - look for img src near this link
-      const imgMatches = [...surroundingHtml.matchAll(/src="(https?:\/\/trendybeatz\.com\/images\/[^"]+)"/g)];
-      if (imgMatches.length > 0) {
-        // Take the last image found before the link
-        image = imgMatches[imgMatches.length - 1][1];
-      }
-
-      // Parse from slug as fallback
-      const slugParts = decodeURIComponent(slug).replace(/-/g, " ").replace(/,/g, ",");
-      
-      // Try to find artist and title from HTML content near the link
-      // Look for patterns like: <strong>Artist Name</strong> or bold text
-      const textBlocks = surroundingHtml.match(/>([^<]{2,80})</g);
-      if (textBlocks) {
-        const cleanTexts = textBlocks
-          .map((t: string) => t.replace(/^>|<$/g, "").trim())
-          .filter((t: string) => 
-            t.length > 1 && 
-            !t.includes("http") && 
-            !t.includes("{") &&
-            !t.includes("Discover") &&
-            !t.includes("Stream") &&
-            t !== "|" &&
-            !t.startsWith("🇳🇬") &&
-            !t.startsWith("🇬🇭") &&
-            !t.startsWith("🇿🇦") &&
-            t !== "Naija" &&
-            t !== "Music" &&
-            t !== "Ghana" &&
-            t !== "African" &&
-            t !== "Song of the Day"
-          );
-
-        // Usually the last few text blocks before the link contain artist then title
-        if (cleanTexts.length >= 2) {
-          // Find the artist and title - they're typically the last 2 meaningful texts
-          artist = cleanTexts[cleanTexts.length - 2] || "";
-          title = cleanTexts[cleanTexts.length - 1] || "";
-        } else if (cleanTexts.length === 1) {
-          title = cleanTexts[0];
+        for (const song of parsed) {
+          if (seen.has(song.id)) continue;
+          seen.add(song.id);
+          allSongs.push(song);
         }
+      } catch (err) {
+        console.log("Source failed:", url, err instanceof Error ? err.message : String(err));
       }
-
-      // Fallback: parse from slug
-      if (!title) {
-        // Slug: artist-song-title-ft-featured
-        const parts = slugParts.split(" ft ");
-        const mainPart = parts[0];
-        const words = mainPart.split(" ");
-        // First 1-2 words are often the artist
-        if (words.length > 2) {
-          artist = words.slice(0, 2).join(" ");
-          title = words.slice(2).join(" ");
-        } else {
-          title = mainPart;
-        }
-        if (parts[1]) {
-          title += ` ft ${parts[1]}`;
-        }
-      }
-
-      // Capitalize title
-      title = title.replace(/\b\w/g, (c: string) => c.toUpperCase());
-
-      if (!title) continue;
-
-      songs.push({ id, title, artist, image, link });
     }
 
-    console.log(`Found ${songs.length} songs`);
+    const filtered = query
+      ? allSongs.filter(
+          (song) =>
+            song.title.toLowerCase().includes(query) || song.artist.toLowerCase().includes(query)
+        )
+      : allSongs;
 
-    return new Response(JSON.stringify({ success: true, data: songs }), {
+    console.log(`Found ${filtered.length} songs`);
+
+    return new Response(JSON.stringify({ success: true, data: filtered.slice(0, 300) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
@@ -149,7 +190,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error instanceof Error ? error.message : "Failed to scrape",
+        error: error instanceof Error ? error.message : "Failed to scrape music",
       }),
       {
         status: 500,

@@ -11,7 +11,11 @@ const MediaDetailModal = ({ item, onClose }: MediaDetailModalProps) => {
   if (!item) return null;
 
   const isMovie = item.mediaType !== "song";
-  const sourceLabel = isMovie ? "t4tsa.cc" : "trendybeatz.com";
+  const sourceLabel = isMovie
+    ? item.link.includes("fzmovies.net")
+      ? "fzmovies.net"
+      : "thenkiri.com"
+    : "trendybeatz.com";
 
   return (
     <AnimatePresence>
