@@ -170,12 +170,11 @@ Deno.serve(async (req) => {
 
     const fzUrls = query
       ? [
-          `https://fzmovies.net/csearch.php?searchname=${encodeURIComponent(query)}&searchby=name&category=hollywood&pg=1`,
-          `https://www.fzmovies.net/csearch.php?searchname=${encodeURIComponent(query)}&searchby=name&category=hollywood&pg=1`,
+          `https://fzmovies.website/csearch.php?searchname=${encodeURIComponent(query)}&searchby=name&category=hollywood&pg=1`,
         ]
       : [
-          "https://fzmovies.net/csearch.php?searchname=2026&searchby=name&category=hollywood&pg=1",
-          "https://fzmovies.net/csearch.php?searchname=2025&searchby=name&category=hollywood&pg=1",
+          "https://fzmovies.website/csearch.php?searchname=2026&searchby=name&category=hollywood&pg=1",
+          "https://fzmovies.website/csearch.php?searchname=2025&searchby=name&category=hollywood&pg=1",
         ];
 
     const allItems: MovieItem[] = [];

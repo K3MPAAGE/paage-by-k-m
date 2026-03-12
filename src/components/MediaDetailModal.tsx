@@ -12,8 +12,8 @@ const MediaDetailModal = ({ item, onClose }: MediaDetailModalProps) => {
 
   const isMovie = item.mediaType !== "song";
   const sourceLabel = isMovie
-    ? item.link.includes("fzmovies.net")
-      ? "fzmovies.net"
+    ? item.link.includes("fzmovies.website")
+      ? "fzmovies.website"
       : "thenkiri.com"
     : "trendybeatz.com";
 
