@@ -100,7 +100,7 @@ const parseFzMovies = (html: string): MovieItem[] => {
 
   let match: RegExpExecArray | null;
   while ((match = regex.exec(html)) !== null) {
-    const link = toAbsoluteUrl(match[1], "https://fzmovies.net");
+    const link = toAbsoluteUrl(match[1], "https://fzmovies.website");
     const slug = match[2];
 
     const around = html.substring(Math.max(0, match.index - 300), match.index + 500);
