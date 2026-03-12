@@ -1,4 +1,4 @@
-import type { MediaItem } from "@/lib/mediaData";
+import type { MediaItem } from "@/hooks/useMediaData";
 import MediaCard from "./MediaCard";
 
 interface MediaGridProps {
@@ -10,7 +10,7 @@ interface MediaGridProps {
 const MediaGrid = ({ title, items, onSelect }: MediaGridProps) => {
   if (items.length === 0) return null;
 
-  const isMovies = items[0]?.type === "movie";
+  const isMovies = items[0]?.mediaType !== "song";
 
   return (
     <section className="mb-8">

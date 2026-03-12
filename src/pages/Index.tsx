@@ -3,53 +3,86 @@ import AppHeader from "@/components/AppHeader";
 import FilterChips, { type FilterValue } from "@/components/FilterChips";
 import MediaGrid from "@/components/MediaGrid";
 import MediaDetailModal from "@/components/MediaDetailModal";
-import { mediaItems, type MediaItem } from "@/lib/mediaData";
+import { useMovies, useMusic, type MediaItem } from "@/hooks/useMediaData";
+import { Loader2 } from "lucide-react";
 
 const Index = () => {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filter, setFilter] = useState<FilterValue>("All");
   const [selected, setSelected] = useState<MediaItem | null>(null);
+  const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
 
-  const filtered = useMemo(() => {
-    let items = mediaItems;
+  const handleSearchChange = (query: string) => {
+    setSearch(query);
+    if (searchTimeout) clearTimeout(searchTimeout);
+    const timeout = setTimeout(() => setDebouncedSearch(query), 500);
+    setSearchTimeout(timeout);
+  };
 
-    if (search) {
-      const q = search.toLowerCase();
-      items = items.filter(
-        (i) =>
-          i.title.toLowerCase().includes(q) ||
-          i.genre.toLowerCase().includes(q) ||
-          i.extra.toLowerCase().includes(q)
-      );
-    }
+  const { data: movies = [], isLoading: moviesLoading } = useMovies(debouncedSearch);
+  const { data: songs = [], isLoading: songsLoading } = useMusic(debouncedSearch);
 
-    if (filter === "Movies") items = items.filter((i) => i.type === "movie");
-    if (filter === "Songs") items = items.filter((i) => i.type === "song");
-    if (filter === "Trending") items = items.filter((_, idx) => idx % 2 === 0);
-    if (filter === "Recently Added") items = items.filter((i) => i.year === "2025");
+  const movieItems: MediaItem[] = useMemo(
+    () =>
+      movies.map((m) => ({
+        id: m.id,
+        title: m.title,
+        image: m.image,
+        link: m.link,
+        extra: m.type === "series" ? "TV Series" : "Movie",
+        mediaType: m.type as "movie" | "series",
+      })),
+    [movies]
+  );
 
-    return items;
-  }, [search, filter]);
+  const songItems: MediaItem[] = useMemo(
+    () =>
+      songs.map((s) => ({
+        id: s.id,
+        title: s.title,
+        image: s.image,
+        link: s.link,
+        extra: s.artist,
+        mediaType: "song" as const,
+      })),
+    [songs]
+  );
 
-  const movies = filtered.filter((i) => i.type === "movie");
-  const songs = filtered.filter((i) => i.type === "song");
+  const filteredMovies =
+    filter === "Songs" ? [] : movieItems;
+  const filteredSongs =
+    filter === "Movies" ? [] : songItems;
+
+  const isLoading = moviesLoading || songsLoading;
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader searchQuery={search} onSearchChange={setSearch} />
+      <AppHeader searchQuery={search} onSearchChange={handleSearchChange} />
 
       <main className="container pb-12">
         <FilterChips active={filter} onSelect={setFilter} />
 
-        {movies.length === 0 && songs.length === 0 && (
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+            <p className="font-display text-lg">Loading content...</p>
+          </div>
+        )}
+
+        {!isLoading && filteredMovies.length === 0 && filteredSongs.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
             <p className="font-display text-lg">No results found</p>
             <p className="text-sm mt-1">Try a different search or filter</p>
           </div>
         )}
 
-        <MediaGrid title="🎬 Movies" items={movies} onSelect={setSelected} />
-        <MediaGrid title="🎵 Songs" items={songs} onSelect={setSelected} />
+        {!isLoading && (
+          <>
+            <MediaGrid title="🎬 Movies & Series" items={filteredMovies} onSelect={setSelected} />
+            <MediaGrid title="🎵 Music" items={filteredSongs} onSelect={setSelected} />
+          </>
+        )}
       </main>
 
       <MediaDetailModal item={selected} onClose={() => setSelected(null)} />
