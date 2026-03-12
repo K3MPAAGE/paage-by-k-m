@@ -9,9 +9,14 @@ const AppHeader = ({ searchQuery, onSearchChange }: AppHeaderProps) => {
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
       <div className="container flex items-center justify-between gap-4 py-4">
-        <h1 className="font-display text-xl md:text-2xl font-bold tracking-tight text-foreground whitespace-nowrap">
-          PAAGE <span className="text-primary">by K³M</span>
-        </h1>
+        <div className="whitespace-nowrap">
+          <h1 className="font-display text-xl md:text-2xl font-bold tracking-tight text-foreground">
+            PAAGE <span className="text-primary">by K³M</span>
+          </h1>
+          <p className="text-[10px] text-muted-foreground leading-tight">
+            Movies via t4tsa.cc · Music via trendybeatz.com
+          </p>
+        </div>
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input

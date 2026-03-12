@@ -80,10 +80,22 @@ const MediaDetailModal = ({ item, onClose }: MediaDetailModalProps) => {
             {item.description}
           </p>
 
-          <button className="mt-5 w-full flex items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground font-display font-semibold py-3 transition-all hover:shadow-glow hover:brightness-110 active:scale-[0.98]">
+          <a
+            href={
+              item.type === "movie"
+                ? `https://t4tsa.cc/search?q=${encodeURIComponent(item.title)}`
+                : `https://trendybeatz.com/search?q=${encodeURIComponent(item.title)}`
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-5 w-full flex items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground font-display font-semibold py-3 transition-all hover:shadow-glow hover:brightness-110 active:scale-[0.98]"
+          >
             <Download className="h-4 w-4" />
             Download ({item.size})
-          </button>
+          </a>
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            via {item.type === "movie" ? "t4tsa.cc" : "trendybeatz.com"}
+          </p>
         </motion.div>
       </motion.div>
     </AnimatePresence>
