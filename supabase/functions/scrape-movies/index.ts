@@ -199,9 +199,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    const filtered = query
-      ? allItems.filter((item) => item.title.toLowerCase().includes(query))
-      : allItems;
+    // Trust source search results - don't re-filter
+    const filtered = allItems;
 
     console.log(`Found ${filtered.length} items`);
 
