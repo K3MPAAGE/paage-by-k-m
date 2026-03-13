@@ -157,25 +157,38 @@ Deno.serve(async (req) => {
     const { search = "" } = await req.json().catch(() => ({}));
     const query = String(search || "").trim().toLowerCase();
 
-    const nkiriUrls = query
-      ? [
-          `https://thenkiri.com/?s=${encodeURIComponent(query)}`,
-          `https://nkiri.ink/?s=${encodeURIComponent(query)}`,
-        ]
-      : [
-          "https://thenkiri.com/?s=2026",
-          "https://thenkiri.com/?s=2025",
-          "https://thenkiri.com/?s=2024",
-        ];
+    const nkiriUrls: string[] = [];
+    const fzUrls: string[] = [];
 
-    const fzUrls = query
-      ? [
-          `https://fzmovies.website/csearch.php?searchname=${encodeURIComponent(query)}&searchby=name&category=hollywood&pg=1`,
-        ]
-      : [
-          "https://fzmovies.website/csearch.php?searchname=2026&searchby=name&category=hollywood&pg=1",
-          "https://fzmovies.website/csearch.php?searchname=2025&searchby=name&category=hollywood&pg=1",
-        ];
+    if (query) {
+      nkiriUrls.push(
+        `https://thenkiri.com/?s=${encodeURIComponent(query)}`,
+        `https://nkiri.ink/?s=${encodeURIComponent(query)}`
+      );
+      fzUrls.push(
+        `https://fzmovies.website/csearch.php?searchname=${encodeURIComponent(query)}&searchby=name&category=hollywood&pg=1`,
+        `https://fzmovies.website/csearch.php?searchname=${encodeURIComponent(query)}&searchby=name&category=hollywood&pg=2`
+      );
+    } else {
+      // Cover movies from 2000 to present
+      const currentYear = new Date().getFullYear();
+      const years = [];
+      for (let y = currentYear; y >= 2000; y--) {
+        years.push(y);
+      }
+      // Nkiri: search by year (limit to recent + spread across decades)
+      const nkiriYears = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3,
+        2020, 2018, 2015, 2012, 2010, 2008, 2005, 2003, 2000];
+      for (const y of nkiriYears) {
+        nkiriUrls.push(`https://thenkiri.com/?s=${y}`);
+      }
+      // FzMovies: search by year across the range
+      const fzYears = [currentYear, currentYear - 1, currentYear - 2, 2022, 2020,
+        2018, 2015, 2012, 2010, 2007, 2005, 2003, 2000];
+      for (const y of fzYears) {
+        fzUrls.push(`https://fzmovies.website/csearch.php?searchname=${y}&searchby=name&category=hollywood&pg=1`);
+      }
+    }
 
     const allItems: MovieItem[] = [];
     const seen = new Set<string>();

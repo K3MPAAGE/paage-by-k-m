@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
     const query = String(search || "").trim().toLowerCase();
 
     // trendybeatz search is client-rendered, so fetch multiple listing pages and filter locally
-    const pages = query ? 5 : 3;
+    const pages = query ? 8 : 10;
     const urls = Array.from({ length: pages }, (_, i) =>
       i === 0
         ? "https://trendybeatz.com/music-download"
