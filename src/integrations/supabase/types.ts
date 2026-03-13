@@ -14,13 +14,156 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      favorites: {
+        Row: {
+          created_at: string | null
+          extra: string | null
+          id: string
+          image: string | null
+          link: string
+          media_type: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          extra?: string | null
+          id?: string
+          image?: string | null
+          link: string
+          media_type: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          extra?: string | null
+          id?: string
+          image?: string | null
+          link?: string
+          media_type?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      playlist_items: {
+        Row: {
+          created_at: string | null
+          extra: string | null
+          id: string
+          image: string | null
+          link: string
+          media_type: string
+          playlist_id: string
+          position: number | null
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          extra?: string | null
+          id?: string
+          image?: string | null
+          link: string
+          media_type: string
+          playlist_id: string
+          position?: number | null
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          extra?: string | null
+          id?: string
+          image?: string | null
+          link?: string
+          media_type?: string
+          playlist_id?: string
+          position?: number | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_items_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlists: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_public: boolean | null
+          name: string
+          share_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          name: string
+          share_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          name?: string
+          share_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string | null
+          display_name: string | null
+          favorite_genres: string[] | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          favorite_genres?: string[] | null
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          favorite_genres?: string[] | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_playlist_public: { Args: { _playlist_id: string }; Returns: boolean }
+      owns_playlist: {
+        Args: { _playlist_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
