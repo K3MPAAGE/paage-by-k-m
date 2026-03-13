@@ -4,6 +4,8 @@ import FilterChips, { type FilterValue } from "@/components/FilterChips";
 import MediaGrid from "@/components/MediaGrid";
 import MediaDetailModal from "@/components/MediaDetailModal";
 import { useMovies, useMusic, type MediaItem } from "@/hooks/useMediaData";
+import { useFavorites } from "@/hooks/useFavorites";
+import { usePlaylists } from "@/hooks/usePlaylists";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
@@ -12,6 +14,9 @@ const Index = () => {
   const [filter, setFilter] = useState<FilterValue>("All");
   const [selected, setSelected] = useState<MediaItem | null>(null);
   const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+
+  const { toggleFavorite, isFavorite } = useFavorites();
+  const { playlists, addToPlaylist } = usePlaylists();
 
   const handleSearchChange = (query: string) => {
     setSearch(query);
@@ -49,11 +54,8 @@ const Index = () => {
     [songs]
   );
 
-  const filteredMovies =
-    filter === "Songs" ? [] : movieItems;
-  const filteredSongs =
-    filter === "Movies" ? [] : songItems;
-
+  const filteredMovies = filter === "Songs" ? [] : movieItems;
+  const filteredSongs = filter === "Movies" ? [] : songItems;
   const isLoading = moviesLoading || songsLoading;
 
   return (
@@ -79,13 +81,32 @@ const Index = () => {
 
         {!isLoading && (
           <>
-            <MediaGrid title="🎬 Movies & Series" items={filteredMovies} onSelect={setSelected} />
-            <MediaGrid title="🎵 Music" items={filteredSongs} onSelect={setSelected} />
+            <MediaGrid
+              title="🎬 Movies & Series"
+              items={filteredMovies}
+              onSelect={setSelected}
+              isFavorite={isFavorite}
+              onToggleFavorite={toggleFavorite}
+            />
+            <MediaGrid
+              title="🎵 Music"
+              items={filteredSongs}
+              onSelect={setSelected}
+              isFavorite={isFavorite}
+              onToggleFavorite={toggleFavorite}
+            />
           </>
         )}
       </main>
 
-      <MediaDetailModal item={selected} onClose={() => setSelected(null)} />
+      <MediaDetailModal
+        item={selected}
+        onClose={() => setSelected(null)}
+        isFavorite={selected ? isFavorite(selected.link) : false}
+        onToggleFavorite={toggleFavorite}
+        playlists={playlists}
+        onAddToPlaylist={addToPlaylist}
+      />
     </div>
   );
 };

@@ -5,9 +5,11 @@ interface MediaGridProps {
   title: string;
   items: MediaItem[];
   onSelect: (item: MediaItem) => void;
+  isFavorite?: (link: string) => boolean;
+  onToggleFavorite?: (item: MediaItem) => void;
 }
 
-const MediaGrid = ({ title, items, onSelect }: MediaGridProps) => {
+const MediaGrid = ({ title, items, onSelect, isFavorite, onToggleFavorite }: MediaGridProps) => {
   if (items.length === 0) return null;
 
   const isMovies = items[0]?.mediaType !== "song";
@@ -25,7 +27,14 @@ const MediaGrid = ({ title, items, onSelect }: MediaGridProps) => {
         }`}
       >
         {items.map((item, i) => (
-          <MediaCard key={item.id} item={item} index={i} onClick={onSelect} />
+          <MediaCard
+            key={item.id}
+            item={item}
+            index={i}
+            onClick={onSelect}
+            isFavorite={isFavorite?.(item.link)}
+            onToggleFavorite={onToggleFavorite}
+          />
         ))}
       </div>
     </section>

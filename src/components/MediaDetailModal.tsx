@@ -1,13 +1,20 @@
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Download, ExternalLink, User } from "lucide-react";
+import { X, Download, ExternalLink, User, Heart, Plus } from "lucide-react";
 import type { MediaItem } from "@/hooks/useMediaData";
 
 interface MediaDetailModalProps {
   item: MediaItem | null;
   onClose: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (item: MediaItem) => void;
+  playlists?: { id: string; name: string }[];
+  onAddToPlaylist?: (playlistId: string, item: MediaItem) => void;
 }
 
-const MediaDetailModal = ({ item, onClose }: MediaDetailModalProps) => {
+const MediaDetailModal = ({ item, onClose, isFavorite, onToggleFavorite, playlists, onAddToPlaylist }: MediaDetailModalProps) => {
+  const [showPlaylists, setShowPlaylists] = useState(false);
+
   if (!item) return null;
 
   const isMovie = item.mediaType !== "song";
@@ -27,20 +34,16 @@ const MediaDetailModal = ({ item, onClose }: MediaDetailModalProps) => {
         className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
         onClick={onClose}
       >
-        {/* Blurred backdrop with cover image */}
         <div className="absolute inset-0 overflow-hidden">
           <img
             src={item.image}
             alt=""
             className="h-full w-full object-cover scale-110 blur-3xl opacity-30"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
           />
           <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
         </div>
 
-        {/* Bottom sheet / modal */}
         <motion.div
           key="sheet"
           initial={{ y: 100, opacity: 0 }}
@@ -50,10 +53,7 @@ const MediaDetailModal = ({ item, onClose }: MediaDetailModalProps) => {
           className="relative z-10 w-full max-w-lg bg-card border border-border rounded-t-2xl sm:rounded-2xl p-6 mx-4 shadow-card"
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
-          >
+          <button onClick={onClose} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors">
             <X className="h-5 w-5" />
           </button>
 
@@ -61,25 +61,57 @@ const MediaDetailModal = ({ item, onClose }: MediaDetailModalProps) => {
             <img
               src={item.image}
               alt={item.title}
-              className={`rounded-lg object-cover shadow-card ${
-                isMovie ? "w-28 aspect-[2/3]" : "w-28 aspect-square"
-              }`}
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = "/placeholder.svg";
-              }}
+              className={`rounded-lg object-cover shadow-card ${isMovie ? "w-28 aspect-[2/3]" : "w-28 aspect-square"}`}
+              onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
             />
             <div className="flex-1 min-w-0">
-              <h2 className="font-display text-xl font-bold text-foreground">
-                {item.title}
-              </h2>
+              <h2 className="font-display text-xl font-bold text-foreground">{item.title}</h2>
               <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                 <User className="h-3 w-3" /> {item.extra}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Source: {sourceLabel}
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">Source: {sourceLabel}</p>
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-2 mt-3">
+                {onToggleFavorite && (
+                  <button
+                    onClick={() => onToggleFavorite(item)}
+                    className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-display font-semibold transition-all ${
+                      isFavorite
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground"
+                    }`}
+                  >
+                    <Heart className={`h-3 w-3 ${isFavorite ? "fill-current" : ""}`} />
+                    {isFavorite ? "Favorited" : "Favorite"}
+                  </button>
+                )}
+                {playlists && playlists.length > 0 && onAddToPlaylist && (
+                  <button
+                    onClick={() => setShowPlaylists(!showPlaylists)}
+                    className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-display font-semibold bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground transition-all"
+                  >
+                    <Plus className="h-3 w-3" /> Playlist
+                  </button>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Playlist picker */}
+          {showPlaylists && playlists && onAddToPlaylist && (
+            <div className="mt-3 bg-background border border-border rounded-lg p-2 max-h-32 overflow-y-auto">
+              {playlists.map((pl) => (
+                <button
+                  key={pl.id}
+                  onClick={() => { onAddToPlaylist(pl.id, item); setShowPlaylists(false); }}
+                  className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-secondary rounded-md transition-colors"
+                >
+                  {pl.name}
+                </button>
+              ))}
+            </div>
+          )}
 
           <a
             href={item.link}
