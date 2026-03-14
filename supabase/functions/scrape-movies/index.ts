@@ -60,7 +60,7 @@ const parseNkiri = (html: string): MovieItem[] => {
 
   for (const article of articles) {
     const hrefMatch =
-      article.match(/<a[^>]+href="([^"]+)"[^>]*class="thumbnail-link[^\"]*"/i) ||
+      article.match(/<a[^>]+href="([^"]+)"[^>]*class="thumbnail-link[^"]*"/i) ||
       article.match(/<a[^>]+href="([^"]+)"[^>]*title="Continue Reading"/i);
     if (!hrefMatch?.[1]) continue;
 
@@ -154,42 +154,83 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { search = "" } = await req.json().catch(() => ({}));
+    const { search = "", page = 1 } = await req.json().catch(() => ({}));
     const query = String(search || "").trim().toLowerCase();
+    const pageNum = Math.max(1, Number(page) || 1);
 
     const nkiriUrls: string[] = [];
     const fzUrls: string[] = [];
 
     if (query) {
-      nkiriUrls.push(
-        `https://thenkiri.com/?s=${encodeURIComponent(query)}`,
-        `https://nkiri.ink/?s=${encodeURIComponent(query)}`
-      );
-      fzUrls.push(
-        `https://fzmovies.website/csearch.php?searchname=${encodeURIComponent(query)}&searchby=name&category=hollywood&pg=1`,
-        `https://fzmovies.website/csearch.php?searchname=${encodeURIComponent(query)}&searchby=name&category=hollywood&pg=2`
-      );
+      // For search: scrape multiple pages for broader results
+      for (let p = 1; p <= 4; p++) {
+        nkiriUrls.push(
+          `https://thenkiri.com/page/${p}/?s=${encodeURIComponent(query)}`,
+          `https://nkiri.ink/page/${p}/?s=${encodeURIComponent(query)}`
+        );
+        fzUrls.push(
+          `https://fzmovies.website/csearch.php?searchname=${encodeURIComponent(query)}&searchby=name&category=hollywood&pg=${p}`,
+          `https://fzmovies.website/csearch.php?searchname=${encodeURIComponent(query)}&searchby=name&category=bollywood&pg=${p}`
+        );
+      }
     } else {
-      // Cover movies from 2000 to present
+      // Browse mode with pagination
       const currentYear = new Date().getFullYear();
-      const years = [];
+      const allYears: number[] = [];
       for (let y = currentYear; y >= 2000; y--) {
-        years.push(y);
+        allYears.push(y);
       }
-      // Nkiri: search by year (limit to recent + spread across decades)
-      const nkiriYears = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3,
-        2020, 2018, 2015, 2012, 2010, 2008, 2005, 2003, 2000];
-      for (const y of nkiriYears) {
+
+      // Each page covers a chunk of years
+      const yearsPerPage = 5;
+      const startIdx = (pageNum - 1) * yearsPerPage;
+      const pageYears = allYears.slice(startIdx, startIdx + yearsPerPage);
+
+      if (pageYears.length === 0) {
+        return new Response(
+          JSON.stringify({ success: true, data: [], hasMore: false }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      for (const y of pageYears) {
         nkiriUrls.push(`https://thenkiri.com/?s=${y}`);
-      }
-      // FzMovies: search by year across the range
-      const fzYears = [currentYear, currentYear - 1, currentYear - 2, 2022, 2020,
-        2018, 2015, 2012, 2010, 2007, 2005, 2003, 2000];
-      for (const y of fzYears) {
+        nkiriUrls.push(`https://thenkiri.com/page/2/?s=${y}`);
         fzUrls.push(`https://fzmovies.website/csearch.php?searchname=${y}&searchby=name&category=hollywood&pg=1`);
+        fzUrls.push(`https://fzmovies.website/csearch.php?searchname=${y}&searchby=name&category=hollywood&pg=2`);
       }
+
+      const hasMore = startIdx + yearsPerPage < allYears.length;
+
+      const allItems: MovieItem[] = [];
+      const seen = new Set<string>();
+
+      for (const url of [...nkiriUrls, ...fzUrls]) {
+        try {
+          console.log("Fetching:", url);
+          const html = await fetchHtml(url);
+          const parsed = /(thenkiri\.com|nkiri\.ink)/i.test(url)
+            ? parseNkiri(html)
+            : parseFzMovies(html);
+
+          for (const item of parsed) {
+            if (seen.has(item.id)) continue;
+            seen.add(item.id);
+            allItems.push(item);
+          }
+        } catch (err) {
+          console.log("Source failed:", url, err instanceof Error ? err.message : String(err));
+        }
+      }
+
+      console.log(`Found ${allItems.length} items (page ${pageNum})`);
+
+      return new Response(JSON.stringify({ success: true, data: allItems, hasMore }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
+    // Search mode - no pagination, return all results
     const allItems: MovieItem[] = [];
     const seen = new Set<string>();
 
@@ -197,7 +238,6 @@ Deno.serve(async (req) => {
       try {
         console.log("Fetching:", url);
         const html = await fetchHtml(url);
-
         const parsed = /(thenkiri\.com|nkiri\.ink)/i.test(url)
           ? parseNkiri(html)
           : parseFzMovies(html);
@@ -212,12 +252,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Trust source search results - don't re-filter
-    const filtered = allItems;
+    console.log(`Found ${allItems.length} items (search: "${query}")`);
 
-    console.log(`Found ${filtered.length} items`);
-
-    return new Response(JSON.stringify({ success: true, data: filtered.slice(0, 300) }), {
+    return new Response(JSON.stringify({ success: true, data: allItems, hasMore: false }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

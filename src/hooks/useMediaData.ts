@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ScrapedMovie {
@@ -26,37 +26,46 @@ export type MediaItem = {
   mediaType: "movie" | "series" | "song";
 };
 
-async function fetchMovies(search = ""): Promise<ScrapedMovie[]> {
+type MovieResponse = { success: boolean; data: ScrapedMovie[]; hasMore: boolean; error?: string };
+type MusicResponse = { success: boolean; data: ScrapedSong[]; hasMore: boolean; error?: string };
+
+async function fetchMovies(search = "", page = 1): Promise<MovieResponse> {
   const { data, error } = await supabase.functions.invoke("scrape-movies", {
-    body: { search },
+    body: { search, page },
   });
   if (error) throw error;
   if (!data?.success) throw new Error(data?.error || "Failed to fetch movies");
-  return data.data;
+  return data;
 }
 
-async function fetchMusic(search = ""): Promise<ScrapedSong[]> {
+async function fetchMusic(search = "", page = 1): Promise<MusicResponse> {
   const { data, error } = await supabase.functions.invoke("scrape-music", {
-    body: { search },
+    body: { search, page },
   });
   if (error) throw error;
   if (!data?.success) throw new Error(data?.error || "Failed to fetch music");
-  return data.data;
+  return data;
 }
 
 export function useMovies(search = "") {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ["movies", search],
-    queryFn: () => fetchMovies(search),
+    queryFn: ({ pageParam = 1 }) => fetchMovies(search, pageParam),
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      lastPage.hasMore ? (lastPageParam as number) + 1 : undefined,
+    initialPageParam: 1,
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
 }
 
 export function useMusic(search = "") {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ["music", search],
-    queryFn: () => fetchMusic(search),
+    queryFn: ({ pageParam = 1 }) => fetchMusic(search, pageParam),
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      lastPage.hasMore ? (lastPageParam as number) + 1 : undefined,
+    initialPageParam: 1,
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
