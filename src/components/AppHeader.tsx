@@ -34,7 +34,7 @@ const AppHeader = ({ searchQuery, onSearchChange }: AppHeaderProps) => {
           </p>
         </div>
 
-        <div className="relative flex-1 max-w-2xl">
+        <div className="relative flex-1 mx-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
