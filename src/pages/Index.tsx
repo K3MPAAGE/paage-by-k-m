@@ -25,33 +25,50 @@ const Index = () => {
     setSearchTimeout(timeout);
   };
 
-  const { data: movies = [], isLoading: moviesLoading } = useMovies(debouncedSearch);
-  const { data: songs = [], isLoading: songsLoading } = useMusic(debouncedSearch);
+  const {
+    data: moviesData,
+    isLoading: moviesLoading,
+    fetchNextPage: fetchMoreMovies,
+    hasNextPage: hasMoreMovies,
+    isFetchingNextPage: isFetchingMoreMovies,
+  } = useMovies(debouncedSearch);
+
+  const {
+    data: songsData,
+    isLoading: songsLoading,
+    fetchNextPage: fetchMoreSongs,
+    hasNextPage: hasMoreSongs,
+    isFetchingNextPage: isFetchingMoreSongs,
+  } = useMusic(debouncedSearch);
 
   const movieItems: MediaItem[] = useMemo(
     () =>
-      movies.map((m) => ({
-        id: m.id,
-        title: m.title,
-        image: m.image,
-        link: m.link,
-        extra: m.type === "series" ? "TV Series" : "Movie",
-        mediaType: m.type as "movie" | "series",
-      })),
-    [movies]
+      (moviesData?.pages ?? []).flatMap((page) =>
+        page.data.map((m) => ({
+          id: m.id,
+          title: m.title,
+          image: m.image,
+          link: m.link,
+          extra: m.type === "series" ? "TV Series" : "Movie",
+          mediaType: m.type as "movie" | "series",
+        }))
+      ),
+    [moviesData]
   );
 
   const songItems: MediaItem[] = useMemo(
     () =>
-      songs.map((s) => ({
-        id: s.id,
-        title: s.title,
-        image: s.image,
-        link: s.link,
-        extra: s.artist,
-        mediaType: "song" as const,
-      })),
-    [songs]
+      (songsData?.pages ?? []).flatMap((page) =>
+        page.data.map((s) => ({
+          id: s.id,
+          title: s.title,
+          image: s.image,
+          link: s.link,
+          extra: s.artist,
+          mediaType: "song" as const,
+        }))
+      ),
+    [songsData]
   );
 
   const filteredMovies = filter === "Songs" ? [] : movieItems;
@@ -88,6 +105,19 @@ const Index = () => {
               isFavorite={isFavorite}
               onToggleFavorite={toggleFavorite}
             />
+            {filter !== "Songs" && hasMoreMovies && (
+              <div className="flex justify-center my-6">
+                <button
+                  onClick={() => fetchMoreMovies()}
+                  disabled={isFetchingMoreMovies}
+                  className="flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground font-display font-semibold text-sm hover:brightness-110 transition-all disabled:opacity-50"
+                >
+                  {isFetchingMoreMovies && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isFetchingMoreMovies ? "Loading more movies..." : "Load More Movies"}
+                </button>
+              </div>
+            )}
+
             <MediaGrid
               title="🎵 Music"
               items={filteredSongs}
@@ -95,6 +125,18 @@ const Index = () => {
               isFavorite={isFavorite}
               onToggleFavorite={toggleFavorite}
             />
+            {filter !== "Movies" && hasMoreSongs && (
+              <div className="flex justify-center my-6">
+                <button
+                  onClick={() => fetchMoreSongs()}
+                  disabled={isFetchingMoreSongs}
+                  className="flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground font-display font-semibold text-sm hover:brightness-110 transition-all disabled:opacity-50"
+                >
+                  {isFetchingMoreSongs && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isFetchingMoreSongs ? "Loading more songs..." : "Load More Songs"}
+                </button>
+              </div>
+            )}
           </>
         )}
       </main>
