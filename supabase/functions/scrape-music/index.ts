@@ -146,16 +146,34 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { search = "" } = await req.json().catch(() => ({}));
+    const { search = "", page = 1 } = await req.json().catch(() => ({}));
     const query = String(search || "").trim().toLowerCase();
+    const pageNum = Math.max(1, Number(page) || 1);
 
-    // trendybeatz search is client-rendered, so fetch multiple listing pages and filter locally
-    const pages = query ? 8 : 10;
-    const urls = Array.from({ length: pages }, (_, i) =>
-      i === 0
-        ? "https://trendybeatz.com/music-download"
-        : `https://trendybeatz.com/music-download?page=${i + 1}`
-    );
+    // Each page fetches a different range of trendybeatz listing pages
+    const pagesPerBatch = 10;
+    const startPage = (pageNum - 1) * pagesPerBatch + 1;
+
+    const urls: string[] = [];
+
+    if (query) {
+      // For search: scrape more pages for broader results
+      for (let i = 1; i <= 20; i++) {
+        urls.push(
+          i === 1
+            ? "https://trendybeatz.com/music-download"
+            : `https://trendybeatz.com/music-download?page=${i}`
+        );
+      }
+    } else {
+      for (let i = startPage; i < startPage + pagesPerBatch; i++) {
+        urls.push(
+          i === 1
+            ? "https://trendybeatz.com/music-download"
+            : `https://trendybeatz.com/music-download?page=${i}`
+        );
+      }
+    }
 
     const allSongs: SongItem[] = [];
     const seen = new Set<string>();
@@ -165,6 +183,11 @@ Deno.serve(async (req) => {
         console.log("Fetching:", url);
         const html = await fetchHtml(url);
         const parsed = parseSongsFromHtml(html);
+
+        if (parsed.length === 0 && !query) {
+          // No more pages available
+          break;
+        }
 
         for (const song of parsed) {
           if (seen.has(song.id)) continue;
@@ -183,9 +206,12 @@ Deno.serve(async (req) => {
         )
       : allSongs;
 
-    console.log(`Found ${filtered.length} songs`);
+    // Determine if there's more content
+    const hasMore = !query && filtered.length >= pagesPerBatch * 5;
 
-    return new Response(JSON.stringify({ success: true, data: filtered.slice(0, 300) }), {
+    console.log(`Found ${filtered.length} songs (page ${pageNum})`);
+
+    return new Response(JSON.stringify({ success: true, data: filtered, hasMore }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
