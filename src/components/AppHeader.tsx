@@ -1,4 +1,4 @@
-import { Search, User, Heart, Music, LogOut, LogIn } from "lucide-react";
+import { Search, User, Heart, Music, LogOut, LogIn, Download } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
