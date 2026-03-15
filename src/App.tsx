@@ -29,6 +29,7 @@ const App = () => (
             <Route path="/favorites" element={<Favorites />} />
             <Route path="/playlists" element={<Playlists />} />
             <Route path="/playlist/:shareId" element={<PlaylistDetail />} />
+            <Route path="/install" element={<Install />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
