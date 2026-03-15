@@ -55,6 +55,13 @@ const Auth = () => {
     if (error) toast.error("Google sign-in failed");
   };
 
+  const handleAppleAuth = async () => {
+    const { error } = await lovable.auth.signInWithOAuth("apple", {
+      redirect_uri: window.location.origin,
+    });
+    if (error) toast.error("Apple sign-in failed");
+  };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
