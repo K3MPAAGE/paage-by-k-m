@@ -10,6 +10,7 @@ import Profile from "./pages/Profile.tsx";
 import Favorites from "./pages/Favorites.tsx";
 import Playlists from "./pages/Playlists.tsx";
 import PlaylistDetail from "./pages/PlaylistDetail.tsx";
+import Install from "./pages/Install.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/favorites" element={<Favorites />} />
             <Route path="/playlists" element={<Playlists />} />
             <Route path="/playlist/:shareId" element={<PlaylistDetail />} />
+            <Route path="/install" element={<Install />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -1,4 +1,4 @@
-import { Search, User, Heart, Music, LogOut, LogIn } from "lucide-react";
+import { Search, User, Heart, Music, LogOut, LogIn, Download } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
@@ -72,6 +72,9 @@ const AppHeader = ({ searchQuery, onSearchChange }: AppHeaderProps) => {
               </button>
               <button onClick={() => { navigate("/playlists"); setMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-secondary transition-colors">
                 <Music className="h-4 w-4 text-muted-foreground" /> Playlists
+              </button>
+              <button onClick={() => { navigate("/install"); setMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-secondary transition-colors">
+                <Download className="h-4 w-4 text-muted-foreground" /> Install App
               </button>
               <div className="h-px bg-border my-1" />
               <button onClick={() => { signOut(); setMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-destructive hover:bg-secondary transition-colors">
