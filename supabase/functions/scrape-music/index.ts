@@ -12,18 +12,6 @@ type SongItem = {
   link: string;
 };
 
-const stopWords = new Set([
-  "discover",
-  "stream",
-  "music",
-  "naija",
-  "ghana",
-  "african",
-  "song of the day",
-  "|",
-  "download",
-]);
-
 const decodeHtml = (text: string) =>
   text
     .replace(/&amp;/g, "&")
@@ -40,6 +28,11 @@ const toTitleCase = (text: string) =>
     .map((w) => w[0]?.toUpperCase() + w.slice(1))
     .join(" ");
 
+const stopWords = new Set([
+  "discover", "stream", "music", "naija", "ghana", "african",
+  "song of the day", "|", "download",
+]);
+
 const isNoise = (text: string) => {
   const t = text.trim().toLowerCase();
   if (!t) return true;
@@ -51,31 +44,23 @@ const isNoise = (text: string) => {
 };
 
 const parseFromSlug = (slug: string) => {
-  const clean = decodeURIComponent(slug)
-    .replace(/-/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
+  const clean = decodeURIComponent(slug).replace(/-/g, " ").replace(/\s+/g, " ").trim();
   const words = clean.split(" ");
-  if (words.length <= 2) {
-    return { artist: "", title: toTitleCase(clean) };
-  }
-
+  if (words.length <= 2) return { artist: "", title: toTitleCase(clean) };
   const ftIndex = words.findIndex((w) => w.toLowerCase() === "ft");
   const splitAt = words.length > 4 ? 2 : 1;
   const artist = toTitleCase(words.slice(0, splitAt).join(" "));
   const titleWords = words.slice(splitAt);
-
   const title = toTitleCase(
     ftIndex > splitAt
       ? [...words.slice(splitAt, ftIndex), "ft", ...words.slice(ftIndex + 1)].join(" ")
       : titleWords.join(" ")
   );
-
   return { artist, title };
 };
 
-const parseSongsFromHtml = (html: string): SongItem[] => {
+// Parse songs from the browse/listing pages
+const parseSongsFromListingHtml = (html: string): SongItem[] => {
   const results: SongItem[] = [];
   const regex = /href=["']((?:https?:\/\/trendybeatz\.com)?\/download-mp3\/(\d+)\/([^"']+))["']/gi;
 
@@ -86,7 +71,6 @@ const parseSongsFromHtml = (html: string): SongItem[] => {
     const slug = match[3];
 
     const around = html.substring(Math.max(0, match.index - 1800), match.index + 700);
-
     const imageMatches = [...around.matchAll(/src=["'](https?:\/\/trendybeatz\.com\/images\/[^"']+)["']/gi)];
     const image = imageMatches.length ? imageMatches[imageMatches.length - 1][1] : "/placeholder.svg";
 
@@ -98,45 +82,72 @@ const parseSongsFromHtml = (html: string): SongItem[] => {
     let title = textMatches.length >= 1 ? textMatches[textMatches.length - 1] : "";
 
     const parsedFromSlug = parseFromSlug(slug);
+    if (!title || isNoise(title) || title.includes("--")) title = parsedFromSlug.title;
+    if (!artist || isNoise(artist)) artist = parsedFromSlug.artist;
+    if (!title) continue;
 
-    if (!title || isNoise(title) || title.includes("--")) {
-      title = parsedFromSlug.title;
+    results.push({ id, title: toTitleCase(title), artist: toTitleCase(artist), image, link });
+  }
+  return results;
+};
+
+// Parse songs from the search results page (different HTML structure)
+const parseSongsFromSearchHtml = (html: string): SongItem[] => {
+  const results: SongItem[] = [];
+  // Search results use: <a href="/download-mp3/ID/SLUG"> with <h3> for title and <img> for image
+  const blockRegex = /<a\s+href=["']((?:https?:\/\/trendybeatz\.com)?\/download-mp3\/(\d+)\/([^"']+))["'][^>]*>[\s\S]*?<\/a>/gi;
+
+  let match: RegExpExecArray | null;
+  while ((match = blockRegex.exec(html)) !== null) {
+    const link = match[1].startsWith("http") ? match[1] : `https://trendybeatz.com${match[1]}`;
+    const id = match[2];
+    const slug = match[3];
+    const block = match[0];
+
+    // Extract image
+    const imgMatch = block.match(/src=["'](https?:\/\/trendybeatz\.com\/images\/[^"']+)["']/i);
+    const image = imgMatch ? imgMatch[1] : "/placeholder.svg";
+
+    // Extract title from <h3>
+    const h3Match = block.match(/<h3[^>]*>([^<]+)<\/h3>/i);
+    const rawTitle = h3Match ? decodeHtml(h3Match[1]) : "";
+
+    // Parse artist and title from the h3 text or slug
+    let artist = "";
+    let title = rawTitle;
+
+    if (rawTitle) {
+      // Titles often look like "Artist Name Song Title Ft Someone"
+      // Try to split intelligently
+      const ftMatch = rawTitle.match(/^(.+?)\s+(Ft\s+.+)$/i);
+      if (ftMatch) {
+        title = rawTitle; // Keep full title with ft
+      }
     }
 
-    if (!artist || isNoise(artist)) {
-      artist = parsedFromSlug.artist;
+    if (!title) {
+      const parsed = parseFromSlug(slug);
+      artist = parsed.artist;
+      title = parsed.title;
     }
 
     if (!title) continue;
 
-    results.push({
-      id,
-      title: toTitleCase(title),
-      artist: toTitleCase(artist),
-      image,
-      link,
-    });
+    results.push({ id, title: toTitleCase(title), artist: toTitleCase(artist), image, link });
   }
-
   return results;
 };
 
 const fetchHtml = async (url: string) => {
   const res = await fetch(url, {
     headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36",
-      Accept:
-        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
       "Accept-Language": "en-US,en;q=0.9",
       Connection: "keep-alive",
     },
   });
-
-  if (!res.ok) {
-    throw new Error(`Fetch failed [${res.status}] ${url}`);
-  }
-
+  if (!res.ok) throw new Error(`Fetch failed [${res.status}] ${url}`);
   return await res.text();
 };
 
@@ -147,48 +158,75 @@ Deno.serve(async (req) => {
 
   try {
     const { search = "", page = 1 } = await req.json().catch(() => ({}));
-    const query = String(search || "").trim().toLowerCase();
+    const query = String(search || "").trim();
     const pageNum = Math.max(1, Number(page) || 1);
-
-    // Each page fetches a different range of trendybeatz listing pages
-    const pagesPerBatch = 10;
-    const startPage = (pageNum - 1) * pagesPerBatch + 1;
-
-    const urls: string[] = [];
-
-    if (query) {
-      // For search: scrape more pages for broader results
-      for (let i = 1; i <= 20; i++) {
-        urls.push(
-          i === 1
-            ? "https://trendybeatz.com/music-download"
-            : `https://trendybeatz.com/music-download?page=${i}`
-        );
-      }
-    } else {
-      for (let i = startPage; i < startPage + pagesPerBatch; i++) {
-        urls.push(
-          i === 1
-            ? "https://trendybeatz.com/music-download"
-            : `https://trendybeatz.com/music-download?page=${i}`
-        );
-      }
-    }
 
     const allSongs: SongItem[] = [];
     const seen = new Set<string>();
 
-    for (const url of urls) {
+    if (query) {
+      // Use the native search endpoint for search queries
+      const searchUrl = `https://trendybeatz.com/search?search=${encodeURIComponent(query)}&submit=Search+source+code`;
+      console.log("Searching:", searchUrl);
+      
+      try {
+        const html = await fetchHtml(searchUrl);
+        
+        // Try search-specific parser first, fall back to listing parser
+        let parsed = parseSongsFromSearchHtml(html);
+        if (parsed.length === 0) {
+          parsed = parseSongsFromListingHtml(html);
+        }
+        
+        for (const song of parsed) {
+          if (seen.has(song.id)) continue;
+          seen.add(song.id);
+          allSongs.push(song);
+        }
+        
+        console.log(`Search found ${allSongs.length} results for "${query}"`);
+      } catch (err) {
+        console.error("Search failed:", err instanceof Error ? err.message : String(err));
+      }
+
+      // Also check artist page if we got few results
+      if (allSongs.length < 10) {
+        const artistSlug = query.toLowerCase().replace(/\s+/g, "-");
+        const artistUrl = `https://trendybeatz.com/artist/${artistSlug}`;
+        console.log("Trying artist page:", artistUrl);
+        try {
+          const html = await fetchHtml(artistUrl);
+          const parsed = parseSongsFromListingHtml(html);
+          for (const song of parsed) {
+            if (seen.has(song.id)) continue;
+            seen.add(song.id);
+            allSongs.push(song);
+          }
+          console.log(`Artist page added ${parsed.length} songs`);
+        } catch {
+          // Artist page doesn't exist, that's fine
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, data: allSongs, hasMore: false }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Browse mode: paginate through listing pages
+    const pagesPerBatch = 10;
+    const startPage = (pageNum - 1) * pagesPerBatch + 1;
+
+    for (let i = startPage; i < startPage + pagesPerBatch; i++) {
+      const url = i === 1
+        ? "https://trendybeatz.com/music-download"
+        : `https://trendybeatz.com/music-download?page=${i}`;
       try {
         console.log("Fetching:", url);
         const html = await fetchHtml(url);
-        const parsed = parseSongsFromHtml(html);
-
-        if (parsed.length === 0 && !query) {
-          // No more pages available
-          break;
-        }
-
+        const parsed = parseSongsFromListingHtml(html);
+        if (parsed.length === 0) break;
         for (const song of parsed) {
           if (seen.has(song.id)) continue;
           seen.add(song.id);
@@ -199,32 +237,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    const filtered = query
-      ? allSongs.filter(
-          (song) =>
-            song.title.toLowerCase().includes(query) || song.artist.toLowerCase().includes(query)
-        )
-      : allSongs;
+    const hasMore = allSongs.length >= pagesPerBatch * 5;
+    console.log(`Found ${allSongs.length} songs (page ${pageNum})`);
 
-    // Determine if there's more content
-    const hasMore = !query && filtered.length >= pagesPerBatch * 5;
-
-    console.log(`Found ${filtered.length} songs (page ${pageNum})`);
-
-    return new Response(JSON.stringify({ success: true, data: filtered, hasMore }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: true, data: allSongs, hasMore }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (error) {
     console.error("Error scraping music:", error);
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to scrape music",
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Failed to scrape music" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
